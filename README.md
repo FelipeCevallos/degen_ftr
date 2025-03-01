@@ -1,261 +1,151 @@
-# Eliza 🤖
+# Transaction Roles Pluign
 
-<div align="center">
-  <img src="./docs/static/img/eliza_banner.jpg" alt="Eliza Banner" width="100%" />
-</div>
+This package implements the Flow blockchain transaction model for the Eliza agent framework, allowing agents to interact with the Flow blockchain through a multi-role transaction process.
 
-<div align="center">
+## Overview
 
-📑 [Technical Report](https://arxiv.org/pdf/2501.06781) |  📖 [Documentation](https://elizaos.github.io/eliza/) | 🎯 [Examples](https://github.com/thejoven/awesome-eliza)
+The Flow blockchain uses a unique multi-role transaction model that separates the responsibilities of transaction creation, authorization, and payment. This separation provides enhanced security, flexibility, and composability compared to traditional blockchain transaction models.
 
-</div>
+This implementation provides three key actions that map to the Flow transaction roles:
 
-## 🌍 README Translations
+1. **Transaction Proposer** (`tx-proposer.ts`)
+2. **Transaction Authorizer** (`tx-authorizer.ts`)
+3. **Transaction Payer** (`tx-payer.ts`)
 
-[中文说明](i18n/readme/README_CN.md) | [日本語の説明](i18n/readme/README_JA.md) | [한국어 설명](i18n/readme/README_KOR.md) | [Persian](i18n/readme/README_FA.md) | [Français](i18n/readme/README_FR.md) | [Português](i18n/readme/README_PTBR.md) | [Türkçe](i18n/readme/README_TR.md) | [Русский](i18n/readme/README_RU.md) | [Español](i18n/readme/README_ES.md) | [Italiano](i18n/readme/README_IT.md) | [ไทย](i18n/readme/README_TH.md) | [Deutsch](i18n/readme/README_DE.md) | [Tiếng Việt](i18n/readme/README_VI.md) | [עִברִית](i18n/readme/README_HE.md) | [Tagalog](i18n/readme/README_TG.md) | [Polski](i18n/readme/README_PL.md) | [Arabic](i18n/readme/README_AR.md) | [Hungarian](i18n/readme/README_HU.md) | [Srpski](i18n/readme/README_RS.md) | [Română](i18n/readme/README_RO.md) | [Nederlands](i18n/readme/README_NL.md) | [Ελληνικά](i18n/readme/README_GR.md)
+## Transaction Roles Explained
 
-## 🚩 Overview
+### Transaction Proposer
 
-<div align="center">
-  <img src="./docs/static/img/eliza_diagram.png" alt="Eliza Diagram" width="100%" />
-</div>
+The Transaction Proposer is responsible for creating and proposing transactions. This role:
 
-## ✨ Features
+- Defines the transaction logic using Cadence code
+- Specifies the transaction arguments
+- Provides a human-readable description of the transaction's purpose
+- Creates a unique proposal ID for tracking
 
-- 🛠️ Full-featured Discord, X (Twitter) and Telegram connectors
-- 🔗 Support for every model (Llama, Grok, OpenAI, Anthropic, Gemini, etc.)
-- 👥 Multi-agent and room support
-- 📚 Easily ingest and interact with your documents
-- 💾 Retrievable memory and document store
-- 🚀 Highly extensible - create your own actions and clients
-- 📦 Just works!
+**File**: `tx-proposer.ts`
 
-## Video Tutorials
+### Transaction Authorizer
 
-[AI Agent Dev School](https://www.youtube.com/watch?v=ArptLpQiKfI&list=PLx5pnFXdPTRzWla0RaOxALTSTnVq53fKL)
+The Transaction Authorizer is responsible for reviewing and authorizing transactions. This role:
 
-## 🎯 Use Cases
+- Verifies the transaction proposal is valid
+- Authorizes (or rejects) the transaction using the account's keys
+- Creates an authorization ID for the approved transaction
+- Ensures only approved transactions can proceed to execution
 
-- 🤖 Chatbots
-- 🕵️ Autonomous Agents
-- 📈 Business Process Handling
-- 🎮 Video Game NPCs
-- 🧠 Trading
+**File**: `tx-authorizer.ts`
 
-## 🚀 Quick Start
+### Transaction Payer
 
-### Prerequisites
+The Transaction Payer is responsible for paying the gas fees and executing the transaction. This role:
 
-- [Python 2.7+](https://www.python.org/downloads/)
-- [Node.js 23+](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
-- [pnpm](https://pnpm.io/installation)
+- Sets the gas limit for the transaction
+- Pays for the transaction execution using FLOW tokens
+- Submits the fully signed transaction to the blockchain
+- Monitors the transaction status and reports the result
 
-> **Note for Windows Users:** [WSL 2](https://learn.microsoft.com/en-us/windows/wsl/install-manual) is required.
+**File**: `tx-payer.ts`
 
-### Use the Starter (Recommended for Agent Creation)
+## Value for Flow and Eliza
 
-Full steps and documentation can be found in the [Eliza Starter Repository](https://github.com/elizaOS/eliza-starter).
+### For Flow Blockchain
+
+- **Increased Adoption**: By making it easier to interact with Flow, more users and developers can participate in the ecosystem.
+- **Showcases Unique Features**: Demonstrates the advantages of Flow's multi-role transaction model.
+- **Enhanced Security**: Promotes best practices for secure transaction handling.
+
+### For Eliza Framework
+
+- **Blockchain Integration**: Provides a robust way for Eliza agents to interact with the Flow blockchain.
+- **Advanced Capabilities**: Enables agents to perform complex blockchain operations on behalf of users.
+- **Flexible Architecture**: The modular design allows for easy extension and customization.
+
+## Use Cases
+
+### User-Friendly Wallet Management
+
+Agents can help users manage their Flow wallets by:
+
+- Proposing transactions based on natural language requests
+- Explaining transaction details before authorization
+- Handling gas payments automatically
+
+### Automated DeFi Operations
+
+Agents can automate DeFi operations by:
+
+- Proposing token swaps, liquidity provision, or yield farming strategies
+- Requesting authorization for significant financial transactions
+- Optimizing gas payments based on network conditions
+
+### NFT Management
+
+Agents can assist with NFT operations by:
+
+- Proposing NFT minting, transfers, or marketplace listings
+- Securing authorization for high-value NFT transactions
+- Paying for gas fees during high-demand NFT drops
+
+### Enterprise Workflows
+
+Organizations can implement approval workflows by:
+
+- Having different departments handle different transaction roles
+- Implementing multi-signature authorization processes
+- Centralizing gas payments while distributing authorization
+
+## Architecture
+
+The transaction model is implemented as a set of action handlers within the Eliza agent framework:
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│   Transaction   │     │   Transaction   │     │   Transaction   │
+│    Proposer     │────▶│   Authorizer    │────▶│     Payer       │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+        │                       │                       │
+        ▼                       ▼                       ▼
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Proposal ID    │     │Authorization ID │     │ Transaction ID  │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+```
+
+Each action:
+
+1. Extends the `BaseFlowInjectableAction` class
+2. Implements validation logic to determine when it should be triggered
+3. Executes the appropriate Flow blockchain operations
+4. Returns structured responses to the Eliza runtime
+
+The actions use the `AccountsPoolService` to interact with Flow accounts and the Flow blockchain API.
+
+## Getting Started
+
+To install the plugin, use the following commands in your Eliza project:
+
 ```bash
-git clone https://github.com/elizaos/eliza-starter.git
-cd eliza-starter
-cp .env.example .env
-pnpm i && pnpm build && pnpm start
+npx elizaos plugins add @elizaos-plugins/plugin-di
+npx elizaos plugins add @elizaos-plugins/plugin-flow
+npx elizaos plugins add @elizaos-plugins/plugin-flow-advanced
 ```
 
-### Manually Start Eliza (Only recommended for plugin or platform development)
-
-#### Checkout the latest release
+The plugin requires the following environment variables to be set in your `.env` file:
 
 ```bash
-# Clone the repository
-git clone https://github.com/elizaos/eliza.git
-
-# This project iterates fast, so we recommend checking out the latest release
-git checkout $(git describe --tags --abbrev=0)
-# If the above doesn't checkout the latest release, this should work:
-# git checkout $(git describe --tags `git rev-list --tags --max-count=1`)
+# Flow Blockchain Configuration
+FLOW_ADDRESS=0x3098231afe5ea214
+FLOW_PRIVATE_KEY=5d4dc9a4a6f50d734c5d39793fce09eda416b50ab34038b809f2d278ff9d5116
+FLOW_NETWORK=testnet      # Optional: mainnet, testnet, or emulator (defaults to mainnet)
+FLOW_ENDPOINT_URL=https://rest-testnet.onflow.org      # Optional: Custom RPC endpoint URL
 ```
 
-If you would like the sample character files too, then run this:
-```bash
-# Download characters submodule from the character repos
-git submodule update --init
-```
-
-#### Edit the .env file
-
-Copy .env.example to .env and fill in the appropriate values.
+Example conversation flow:
 
 ```
-cp .env.example .env
+User: "Gimme the most degenerate memecoins about cats"
+Agent: [Uses TransactionProposer] "I've created a proposal to transfer 10 FLOW for 100 DegenCat. Proposal ID: proposal-123..."
+User: "Let's ape into it"
+Agent: [Uses TransactionAuthorizer] "Kinda cringe tbh but here you go. Authorization ID: auth-456..."
+Agent: [Uses TransactionPayer] "Transaction executed successfully. Transaction ID: tx-789..."
 ```
-
-Note: .env is optional. If you're planning to run multiple distinct agents, you can pass secrets through the character JSON
-
-#### Start Eliza
-
-```bash
-pnpm i
-pnpm build
-pnpm start
-
-# The project iterates fast, sometimes you need to clean the project if you are coming back to the project
-pnpm clean
-```
-
-### Interact via Browser
-
-Once the agent is running, you should see the message to run "pnpm start:client" at the end.
-
-Open another terminal, move to the same directory, run the command below, then follow the URL to chat with your agent.
-
-```bash
-pnpm start:client
-```
-
-Then read the [Documentation](https://elizaos.github.io/eliza/) to learn how to customize your Eliza.
-
----
-
-### Automatically Start Eliza
-
-The start script provides an automated way to set up and run Eliza:
-
-```bash
-sh scripts/start.sh
-```
-
-For detailed instructions on using the start script, including character management and troubleshooting, see our [Start Script Guide](./docs/docs/guides/start-script.md).
-
-> **Note**: The start script handles all dependencies, environment setup, and character management automatically.
-
----
-
-### Modify Character
-
-1. Open `packages/core/src/defaultCharacter.ts` to modify the default character. Uncomment and edit.
-
-2. To load custom characters:
-    - Use `pnpm start --characters="path/to/your/character.json"`
-    - Multiple character files can be loaded simultaneously
-3. Connect with X (Twitter)
-    - change `"clients": []` to `"clients": ["twitter"]` in the character file to connect with X
-
----
-
-### Add more plugins
-
-1. run `npx elizaos plugins list` to get a list of available plugins or visit https://elizaos.github.io/registry/
-
-2. run `npx elizaos plugins add @elizaos-plugins/plugin-NAME` to install the plugin into your instance
-
-#### Additional Requirements
-
-You may need to install Sharp. If you see an error when starting up, try installing it with the following command:
-
-```
-pnpm install --include=optional sharp
-```
-
----
-
-### Start Eliza with Gitpod
-
-[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/elizaos/eliza/tree/main)
-
----
-
-### Deploy Eliza in one click
-
-Use [Fleek](https://fleek.xyz/eliza/) to deploy Eliza in one click. This opens Eliza to non-developers and provides the following options to build your agent:
-1. Start with a template
-2. Build characterfile from scratch
-3. Upload pre-made characterfile
-
-Click [here](https://fleek.xyz/eliza/) to get started!
-
----
-
-### Community & contact
-
-- [GitHub Issues](https://github.com/elizaos/eliza/issues). Best for: bugs you encounter using Eliza, and feature proposals.
-- [elizaOS Discord](https://discord.gg/elizaos). Best for: hanging out with the elizaOS technical community
-- [DAO Discord](https://discord.gg/ai16z). Best for: hanging out with the larger non-technical community
-
-## Citation
-
-We now have a [paper](https://arxiv.org/pdf/2501.06781) you can cite for the Eliza OS:
-```bibtex
-@article{walters2025eliza,
-  title={Eliza: A Web3 friendly AI Agent Operating System},
-  author={Walters, Shaw and Gao, Sam and Nerd, Shakker and Da, Feng and Williams, Warren and Meng, Ting-Chien and Han, Hunter and He, Frank and Zhang, Allen and Wu, Ming and others},
-  journal={arXiv preprint arXiv:2501.06781},
-  year={2025}
-}
-```
-
-## Contributors
-
-<a href="https://github.com/elizaos/eliza/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=elizaos/eliza" alt="Eliza project contributors" />
-</a>
-
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=elizaos/eliza&type=Date)](https://star-history.com/#elizaos/eliza&Date)
-
-## 🛠️ System Requirements
-
-### Minimum Requirements
-- CPU: Dual-core processor
-- RAM: 4GB
-- Storage: 1GB free space
-- Internet connection: Broadband (1 Mbps+)
-
-### Software Requirements
-- Python 2.7+ (3.8+ recommended)
-- Node.js 23+
-- pnpm
-- Git
-
-### Optional Requirements
-- GPU: For running local LLM models
-- Additional storage: For document storage and memory
-- Higher RAM: For running multiple agents
-
-## 📁 Project Structure
-```
-eliza/
-├── packages/
-│   ├── core/           # Core Eliza functionality
-│   ├── clients/        # Client implementations
-│   └── actions/        # Custom actions
-├── docs/              # Documentation
-├── scripts/           # Utility scripts
-└── examples/          # Example implementations
-```
-
-## 🤝 Contributing
-
-We welcome contributions! Here's how you can help:
-
-### Getting Started
-1. Fork the repository
-2. Create a new branch: `git checkout -b feature/your-feature-name`
-3. Make your changes
-4. Run tests: `pnpm test`
-5. Submit a pull request
-
-### Types of Contributions
-- 🐛 Bug fixes
-- ✨ New features
-- 📚 Documentation improvements
-- 🌍 Translations
-- 🧪 Test improvements
-
-### Code Style
-- Follow the existing code style
-- Add comments for complex logic
-- Update documentation for changes
-- Add tests for new features

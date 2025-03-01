@@ -4,6 +4,7 @@ import {
     AgentRuntime,
     CacheManager,
     CacheStore,
+    type Plugin,
     type Character,
     type ClientInstance,
     DbCacheAdapter,
@@ -21,6 +22,9 @@ import {
 import { defaultCharacter } from "./defaultCharacter.ts";
 
 import { bootstrapPlugin } from "@elizaos/plugin-bootstrap";
+import { flowPlugin } from "@elizaos-plugins/plugin-flow";
+import { advancedFlowPlugin } from "@elizaos-plugins/plugin-flow-advanced";
+import JSON5 from "json5";
 
 import fs from "fs";
 import net from "net";
@@ -62,7 +66,7 @@ export function parseArguments(): {
             })
             .parseSync();
     } catch (error) {
-        elizaLogger.error("Error parsing arguments:", error);
+        console.error("Error parsing arguments:", error);
         return {};
     }
 }
@@ -116,7 +120,7 @@ export async function loadCharacterFromOnchain(): Promise<Character[]> {
     if (!jsonText) return [];
     const loadedCharacters = [];
     try {
-        const character = JSON.parse(jsonText);
+        const character = JSON5.parse(jsonText);
         validateCharacterConfig(character);
 
         // .id isn't really valid
@@ -182,7 +186,7 @@ async function loadCharactersFromUrl(url: string): Promise<Character[]> {
         }
         return characters;
     } catch (e) {
-        elizaLogger.error(`Error loading character(s) from ${url}: ${e}`);
+        console.error(`Error loading character(s) from ${url}: `, e);
         process.exit(1);
     }
 }
@@ -213,6 +217,27 @@ async function jsonToCharacter(
     }
     // Handle plugins
     character.plugins = await handlePluginImporting(character.plugins);
+    elizaLogger.info(
+        character.name,
+        "loaded plugins:",
+        "[\n    " +
+            character.plugins.map((p) => `"${p.npmName}"`).join(", \n    ") +
+            "\n]"
+    );
+
+    // Handle Post Processors plugins
+    if (character.postProcessors?.length > 0) {
+        elizaLogger.info(
+            character.name,
+            "loading postProcessors",
+            character.postProcessors
+        );
+        character.postProcessors = await handlePluginImporting(
+            character.postProcessors
+        );
+    }
+
+    // Handle extends
     if (character.extends) {
         elizaLogger.info(
             `Merging  ${character.name} character with parent characters`
@@ -235,7 +260,7 @@ async function loadCharacter(filePath: string): Promise<Character> {
     if (!content) {
         throw new Error(`Character file not found: ${filePath}`);
     }
-    const character = JSON.parse(content);
+    const character = JSON5.parse(content);
     return jsonToCharacter(filePath, character);
 }
 
@@ -258,7 +283,7 @@ async function loadCharacterTryPath(characterPath: string): Promise<Character> {
         ), // relative to project root characters dir
     ];
 
-    elizaLogger.info(
+    elizaLogger.debug(
         "Trying paths:",
         pathsToTry.map((p) => ({
             path: p,
@@ -286,10 +311,12 @@ async function loadCharacterTryPath(characterPath: string): Promise<Character> {
     }
     try {
         const character: Character = await loadCharacter(resolvedPath);
-        elizaLogger.info(`Successfully loaded character from: ${resolvedPath}`);
+        elizaLogger.success(
+            `Successfully loaded character from: ${resolvedPath}`
+        );
         return character;
     } catch (e) {
-        elizaLogger.error(`Error parsing character from ${resolvedPath}: ${e}`);
+        console.error(`Error parsing character from ${resolvedPath}: `, e);
         throw new Error(`Error parsing character from ${resolvedPath}: ${e}`);
     }
 }
@@ -360,30 +387,44 @@ export async function loadCharacters(
 
 async function handlePluginImporting(plugins: string[]) {
     if (plugins.length > 0) {
-        elizaLogger.info("Plugins are: ", plugins);
+        // this logging should happen before calling, so we can include important context
+        //elizaLogger.info("Plugins are: ", plugins);
         const importedPlugins = await Promise.all(
             plugins.map(async (plugin) => {
                 try {
-                    const importedPlugin = await import(plugin);
+                    const importedPlugin: Plugin = await import(plugin);
                     const functionName =
                         plugin
                             .replace("@elizaos/plugin-", "")
                             .replace("@elizaos-plugins/plugin-", "")
                             .replace(/-./g, (x) => x[1].toUpperCase()) +
                         "Plugin"; // Assumes plugin function is camelCased with Plugin suffix
-                    return (
-                        importedPlugin.default || importedPlugin[functionName]
-                    );
+                    if (
+                        !importedPlugin[functionName] &&
+                        !importedPlugin.default
+                    ) {
+                        elizaLogger.warn(
+                            plugin,
+                            "does not have an default export or",
+                            functionName
+                        );
+                    }
+                    return {
+                        ...(importedPlugin.default ||
+                            importedPlugin[functionName]),
+                        npmName: plugin,
+                    };
                 } catch (importError) {
-                    elizaLogger.error(
+                    console.error(
                         `Failed to import plugin: ${plugin}`,
                         importError
                     );
-                    return []; // Return null for failed imports
+                    return false; // Return null for failed imports
                 }
             })
         );
-        return importedPlugins;
+        // remove plugins that failed to load, so agent can try to start
+        return importedPlugins.filter((p) => !!p);
     } else {
         return [];
     }
@@ -553,7 +594,12 @@ export function getTokenForProvider(
             );
         case ModelProviderName.NEARAI:
             try {
-                const config = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.nearai/config.json'), 'utf8'));
+                const config = JSON.parse(
+                    fs.readFileSync(
+                        path.join(os.homedir(), ".nearai/config.json"),
+                        "utf8"
+                    )
+                );
                 return JSON.stringify(config?.auth);
             } catch (e) {
                 elizaLogger.warn(`Error loading NEAR AI config: ${e}`);
@@ -586,9 +632,7 @@ export async function initializeClients(
             if (plugin.clients) {
                 for (const client of plugin.clients) {
                     const startedClient = await client.start(runtime);
-                    elizaLogger.debug(
-                        `Initializing client: ${client.name}`
-                    );
+                    elizaLogger.debug(`Initializing client: ${client.name}`);
                     clients.push(startedClient);
                 }
             }
@@ -609,9 +653,7 @@ export async function createAgent(
         evaluators: [],
         character,
         // character.plugins are handled when clients are added
-        plugins: [
-            bootstrapPlugin,
-        ]
+        plugins: [bootstrapPlugin, flowPlugin, advancedFlowPlugin]
             .flat()
             .filter(Boolean),
         providers: [],
@@ -693,23 +735,29 @@ function initializeCache(
 }
 
 async function findDatabaseAdapter(runtime: AgentRuntime) {
-  const { adapters } = runtime;
-  let adapter: Adapter | undefined;
-  // if not found, default to sqlite
-  if (adapters.length === 0) {
-    const sqliteAdapterPlugin = await import('@elizaos-plugins/adapter-sqlite');
-    const sqliteAdapterPluginDefault = sqliteAdapterPlugin.default;
-    adapter = sqliteAdapterPluginDefault.adapters[0];
-    if (!adapter) {
-      throw new Error("Internal error: No database adapter found for default adapter-sqlite");
+    const { adapters } = runtime;
+    let adapter: Adapter | undefined;
+    // if not found, default to sqlite
+    if (adapters.length === 0) {
+        const sqliteAdapterPlugin = await import(
+            "@elizaos-plugins/adapter-sqlite"
+        );
+        const sqliteAdapterPluginDefault = sqliteAdapterPlugin.default;
+        adapter = sqliteAdapterPluginDefault.adapters[0];
+        if (!adapter) {
+            throw new Error(
+                "Internal error: No database adapter found for default adapter-sqlite"
+            );
+        }
+    } else if (adapters.length === 1) {
+        adapter = adapters[0];
+    } else {
+        throw new Error(
+            "Multiple database adapters found. You must have no more than one. Adjust your plugins configuration."
+        );
     }
-  } else if (adapters.length === 1) {
-    adapter = adapters[0];
-  } else {
-    throw new Error("Multiple database adapters found. You must have no more than one. Adjust your plugins configuration.");
-    }
-  const adapterInterface = adapter?.init(runtime);
-  return adapterInterface;
+    const adapterInterface = adapter?.init(runtime);
+    return adapterInterface;
 }
 
 async function startAgent(
@@ -723,10 +771,7 @@ async function startAgent(
 
         const token = getTokenForProvider(character.modelProvider, character);
 
-        const runtime: AgentRuntime = await createAgent(
-            character,
-            token
-        );
+        const runtime: AgentRuntime = await createAgent(character, token);
 
         // initialize database
         // find a db from the plugins
@@ -792,6 +837,34 @@ const hasValidRemoteUrls = () =>
     process.env.REMOTE_CHARACTER_URLS !== "" &&
     process.env.REMOTE_CHARACTER_URLS.startsWith("http");
 
+/**
+ * Post processing of character after loading
+ * @param character
+ */
+const handlePostCharacterLoaded = async (
+    character: Character
+): Promise<Character> => {
+    let processedCharacter = character;
+    // Filtering the plugins with the method of handlePostCharacterLoaded
+    const processors = character?.postProcessors?.filter(
+        (p) => typeof p.handlePostCharacterLoaded === "function"
+    );
+    if (processors?.length > 0) {
+        processedCharacter = Object.assign({}, character, {
+            postProcessors: undefined,
+        });
+        // process the character with each processor
+        // the order is important, so we loop through the processors
+        for (let i = 0; i < processors.length; i++) {
+            const processor = processors[i];
+            processedCharacter = await processor.handlePostCharacterLoaded(
+                processedCharacter
+            );
+        }
+    }
+    return processedCharacter;
+};
+
 const startAgents = async () => {
     const directClient = new DirectClient();
     let serverPort = Number.parseInt(settings.SERVER_PORT || "3000");
@@ -799,13 +872,16 @@ const startAgents = async () => {
     const charactersArg = args.characters || args.character;
     let characters = [defaultCharacter];
 
-    if ((charactersArg) || hasValidRemoteUrls()) {
+    if (charactersArg || hasValidRemoteUrls()) {
         characters = await loadCharacters(charactersArg);
     }
 
     try {
         for (const character of characters) {
-            await startAgent(character, directClient);
+            const processedCharacter = await handlePostCharacterLoaded(
+                character
+            );
+            await startAgent(processedCharacter, directClient);
         }
     } catch (error) {
         elizaLogger.error("Error starting agents:", error);
@@ -824,9 +900,30 @@ const startAgents = async () => {
     directClient.startAgent = async (character) => {
         // Handle plugins
         character.plugins = await handlePluginImporting(character.plugins);
+        elizaLogger.info(
+            character.name,
+            "loaded plugins:",
+            "[" +
+                character.plugins.map((p) => `"${p.npmName}"`).join(", ") +
+                "]"
+        );
+
+        // Handle Post Processors plugins
+        if (character.postProcessors?.length > 0) {
+            elizaLogger.info(
+                character.name,
+                "loading postProcessors",
+                character.postProcessors
+            );
+            character.postProcessors = await handlePluginImporting(
+                character.postProcessors
+            );
+        }
+        // character's post processing
+        const processedCharacter = await handlePostCharacterLoaded(character);
 
         // wrap it so we don't have to inject directClient later
-        return startAgent(character, directClient);
+        return startAgent(processedCharacter, directClient);
     };
 
     directClient.loadCharacterTryPath = loadCharacterTryPath;
@@ -835,7 +932,7 @@ const startAgents = async () => {
     directClient.start(serverPort);
 
     if (serverPort !== Number.parseInt(settings.SERVER_PORT || "3000")) {
-        elizaLogger.log(`Server started on alternate port ${serverPort}`);
+        elizaLogger.warn(`Server started on alternate port ${serverPort}`);
     }
 
     elizaLogger.info(
